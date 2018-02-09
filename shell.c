@@ -62,7 +62,7 @@ int main(int argc, char **argv)
         newfd;
     char** cmd;
 	system("clear");
-	printf("\x1B[31m 😃 Welcome eiei\n");
+	printf("😃 Welcome\n");
 
     // interactive
     if (argc < 2) 
@@ -114,13 +114,61 @@ int main(int argc, char **argv)
 
     // batch
     else {
-	    if ((newfd = open(argv[1], O_CREAT | O_TRUNC | O_WRONLY, 0644)) <  0)
+	    FILE* fp;
+	    char scan[100];
+	    char scanAppend[] = "";
+	    printf("Entering batch mode\n");
+	    fp = fopen(argv[1],"r");
+	    if (!fp)
 	    {
 		perror(argv[1]); /* open failed */
 		exit(1);
 	    }
-    }
 
+	    else {
+		printf("open successful\n");
+
+		while (!feof(fp)){
+			//fscanf(fp, "%s", scan);
+			fgets (scan, 100, fp);	
+			printf("scan: %s\n",scan);
+			//strcat(scanAppend,scan);
+			//strcat(scanAppend," ");
+			//strcpy(scan,"");
+			//printf("scanAppend: %s\n",scanAppend);
+		
+			cmd = str_split(scan, ' ');
+			
+			int i=0;
+			for(i=0;cmd[i];i++) {
+				printf("cmd: %s\n",cmd[i]);
+				if(cmd[i][strlen(cmd[i])-1]=='\n')
+					cmd[i][strlen(cmd[i])-1] = '\0';
+				if(strcmp(cmd[i],"exit")==0)
+					exit(1);
+			}
+
+			int pid = fork();
+			if(pid==0) {
+				int status = execvp(cmd[0], cmd);
+				printf("\x1B[31m");
+				//perror(scanCmd[0]); /* execvp failed */
+				if(status<0)
+					printf("Command Not Found: %s\n",cmd[0]);
+				printf("\x1B[0m");
+				exit(0);
+			} else {
+			waitpid(pid);
+		}
+		
+
+		    for(i=0;cmd[i];i++)
+			free(cmd[i]);
+            }
+        
+        exit(0);
+        }
+    }
 
     exit(1);
 }
