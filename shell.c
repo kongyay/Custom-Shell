@@ -62,7 +62,7 @@ int main(int argc, char **argv)
         newfd;
     char** cmd;
 	system("clear");
-	printf("\x1B[31m 😃 Welcome\n");
+	printf("\x1B[31m 😃 Welcome eiei\n");
 
     // interactive
     if (argc < 2) 
