@@ -107,7 +107,7 @@ int main(int argc, char **argv)
 
                 
         }
-        //fprintf(stderr, "usage: %s output_file\n",                argv[0]);
+        //fprintf(stderr, "usage: %s output_file\n", argv[0]);
         
         exit(0);
     }
@@ -131,7 +131,7 @@ int main(int argc, char **argv)
 		while (!feof(fp)){
 			//fscanf(fp, "%s", scan);
 			fgets (scan, 100, fp);	
-			printf("scan: %s\n",scan);
+			//printf("scan: %s\n",scan);
 			//strcat(scanAppend,scan);
 			//strcat(scanAppend," ");
 			//strcpy(scan,"");
@@ -141,7 +141,7 @@ int main(int argc, char **argv)
 			
 			int i=0;
 			for(i=0;cmd[i];i++) {
-				printf("cmd: %s\n",cmd[i]);
+				//printf("cmd: %s\n",cmd[i]);
 				if(cmd[i][strlen(cmd[i])-1]=='\n')
 					cmd[i][strlen(cmd[i])-1] = '\0';
 				if(strcmp(cmd[i],"exit")==0)
@@ -161,7 +161,6 @@ int main(int argc, char **argv)
 			waitpid(pid);
 		}
 		
-
 		    for(i=0;cmd[i];i++)
 			free(cmd[i]);
             }

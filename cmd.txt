@@ -1,1 +1,5 @@
 ls -al
+date
+ls
+ps
+date --date='last monday'
