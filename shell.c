@@ -4,168 +4,251 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <string.h>
-#include <assert.h>
+#include <ctype.h>
 
-char** str_split(char* a_str, const char a_delim)
+int split(char *str, char *result[], int max_size)
 {
-    char** result    = 0;
-    size_t count     = 0;
-    char* tmp        = a_str;
-    char* last_comma = 0;
-    char delim[2];
-    delim[0] = a_delim;
-    delim[1] = 0;
+    char *p, *start_of_word;
+    int c;
+    enum states { DULL, IN_STRING, IN_WORD } state = DULL;
+    int argc = 0;
+    char quotetype;
 
-    /* Count how many elements will be extracted. */
-    while (*tmp)
-    {
-        if (a_delim == *tmp)
-        {
-            count++;
-            last_comma = tmp;
+    for (p = str; argc < max_size && *p != '\0'; p++) {
+        c = (char) *p;
+        //printf("[%d]%c\n",state,c);
+        switch (state) {
+        case DULL:
+            if (isspace(c)) {
+                continue;
+            }
+
+            if (c == '\"' || c == '\'') {
+                state = IN_STRING;
+                start_of_word = p + 1; 
+                quotetype = c;
+                continue;
+            }
+            state = IN_WORD;
+            start_of_word = p;
+            continue;
+
+        case IN_STRING:
+            if (c == quotetype) {
+                *p = 0;
+                result[argc++] = start_of_word;
+                state = DULL;
+            } else if(isspace(c)) {
+                *p = '+';
+            }
+            continue;
+
+        case IN_WORD:
+            if (isspace(c)) {
+                *p = 0;
+                result[argc++] = start_of_word;
+                state = DULL;
+            }
+            if (c == '\"' || c == '\'') {
+                state = IN_STRING;
+                quotetype = c;
+                *p = '+';
+                continue;
+            }
+            continue;
         }
-        tmp++;
     }
 
-    /* Add space for trailing token. */
-    count += last_comma < (a_str + strlen(a_str) - 1);
+    if (state != DULL && argc < max_size)
+        result[argc++] = start_of_word;
 
-    /* Add space for terminating null string so caller
-       knows where the list of returned strings ends. */
-    count++;
-
-    result = malloc(sizeof(char*) * count);
-
-    if (result)
-    {
-        size_t idx  = 0;
-        char* token = strtok(a_str, delim);
-
-        while (token)
-        {
-            assert(idx < count);
-            *(result + idx++) = strdup(token);
-            token = strtok(0, delim);
-        }
-        assert(idx == count - 1);
-        *(result + idx) = 0;
-    }
-
-    return result;
+    return argc;
 }
 
-int main(int argc, char **argv)
+int splitcmd (char* str, char ***result, char splitter)
 {
-    int pid,
-        status;
-    int
-        newfd;
-    char** cmd;
-	system("clear");
-	printf("😃 Welcome\n");
+    int count = 1;
+    int token_len = 1;
+    int i = 0;
+    char *p;
+    char *t;
+
+    p = str;
+    while (*p != '\0')
+    {
+        if (*p == splitter)
+            count++;
+        p++;
+    }
+
+    *result = (char**) malloc(sizeof(char*) * count);
+    if (*result == NULL)
+        exit(1);
+
+    p = str;
+    while (*p != '\0')
+    {
+        if (*p == splitter)
+        {
+            (*result)[i] = (char*) malloc( sizeof(char) * token_len );
+            if ((*result)[i] == NULL)
+                exit(1);
+
+            token_len = 0;
+            i++;
+        }
+        p++;
+        token_len++;
+    }
+    (*result)[i] = (char*) malloc( sizeof(char) * token_len );
+    if ((*result)[i] == NULL)
+        exit(1);
+
+    i = 0;
+    p = str;
+    t = ((*result)[i]);
+    while (*p != '\0')
+    {
+        if (*p != splitter && *p != '\0')
+        {
+            *t = *p;
+            t++;
+        }
+        else
+        {
+            *t = '\0';
+            i++;
+            t = ((*result)[i]);
+        }
+        p++;
+    }
+
+    return count;
+}
+
+int forkExec(char** cmd) {
+    int i;
+    for (i = 0; cmd[i]; i++)
+    {
+        if (strcmp(cmd[i], "quit") == 0) {
+            printf("\x1B[31mExit shell.. \n\x1B[0m");
+            exit(0);
+        }
+    } 
+
+    int pid = fork();
+    if (pid == 0)
+    {
+        int status = execvp(cmd[0], cmd);
+        //perror(scanCmd[0]); /* execvp failed */
+        if (status < 0) {
+            printf("\x1B[31mCommand Not Found: %s\n\x1B[0m", cmd[0]);
+            exit(1);
+        } 
+     
+        exit(0);
+    }
+    else
+    {
+        int pid_print = fork();
+        if (pid_print == 0) {
+            waitpid(pid);
+            printf("\x1B[34m ------ EXECUTING : %s \x1B[0m\n",cmd[0]);
+            exit(0);
+        }
+        return pid;
+    }
+}
+
+void exec_line(char* scan) {
+    char*** concur;
+    char **cmd;
+    int i,len,len2;
+
+    // Remove '\n' 
+    if (scan[strlen(scan) - 1] == '\n')
+            scan[strlen(scan) - 1] = '\0';
+
+    // Split command by ';'
+    concur = malloc(sizeof(scan));
+    len = splitcmd(scan, &concur, ';');
+    
+    // Run each command concurrently
+    int pid[len]; 
+    if(len>1) printf("\x1B[32m =========== %d commands ===========\x1B[0m\n",len);
+    for(i = 0;concur[i];i++) {
+        
+        cmd = malloc(sizeof(concur[i]));
+        len2 = split(concur[i],cmd,100);
+        pid[i] = forkExec(cmd);
+        
+        
+    }
+    for (i = 0; i<len;i++)
+        waitpid(pid[i]);
+
+    if(len>1) printf("\x1B[32m =========== DONE ===========\x1B[0m\n\n");
+}
+
+int main(int argc, char **result)
+{
+    int pid;
+    int len,len2;
+    
+
+    system("clear");
+    printf("\e[1m    😃 Welcome\n");
 
     // interactive
-    if (argc < 2) 
+    if (argc < 2)
     {
-        printf("\x1B[35m interactive mode\n");
+        printf("\x1B[35mInteractive mode\n\e[0m");
 
-        while(1) {
+        while (1)
+        {
 
+            char scan[100];
+            printf("\e[1m\x1B[32m \nprompt> \e[0m\x1B[0m");
+            fflush(stdin);
+            gets(scan);
 
-            	char line_command[20];
-            	printf("\x1B[32m \nprompt> ");
-		printf("\x1B[0m");
-		fflush(stdin);
-		gets(line_command);
+            exec_line(scan);
 
-
-		    cmd = str_split(line_command, ' ');
-		    int i=0;
-		    for(i=0;cmd[i];i++) {
-			if(strcmp(cmd[i],"exit")==0)
-				exit(1);
-			
-		    }
-
-
-		int pid = fork();
-		if(pid==0) {
-			int status = execvp(cmd[0], cmd);
-			printf("\x1B[31m");
-			//perror(cmd[0]); /* execvp failed */
-			if(status<0)
-				printf("Command Not Found: %s",cmd[0]);
-			printf("\x1B[0m");
-			exit(0);
-		} else {
-			waitpid(pid);
-		}
-		
-
-            for(i=0;cmd[i];i++)
-		free(cmd[i]);
-
-                
         }
-        //fprintf(stderr, "usage: %s output_file\n", argv[0]);
+        //fprintf(stderr, "usage: %s output_file\n", result[0]);
         
         exit(0);
     }
 
     // batch
-    else {
-	    FILE* fp;
-	    char scan[100];
-	    char scanAppend[] = "";
-	    printf("Entering batch mode\n");
-	    fp = fopen(argv[1],"r");
-	    if (!fp)
-	    {
-		perror(argv[1]); /* open failed */
-		exit(1);
-	    }
-
-	    else {
-		printf("open successful\n");
-
-		while (!feof(fp)){
-			//fscanf(fp, "%s", scan);
-			fgets (scan, 100, fp);	
-			//printf("scan: %s\n",scan);
-			//strcat(scanAppend,scan);
-			//strcat(scanAppend," ");
-			//strcpy(scan,"");
-			//printf("scanAppend: %s\n",scanAppend);
-		
-			cmd = str_split(scan, ' ');
-			
-			int i=0;
-			for(i=0;cmd[i];i++) {
-				//printf("cmd: %s\n",cmd[i]);
-				if(cmd[i][strlen(cmd[i])-1]=='\n')
-					cmd[i][strlen(cmd[i])-1] = '\0';
-				if(strcmp(cmd[i],"exit")==0)
-					exit(1);
-			}
-
-			int pid = fork();
-			if(pid==0) {
-				int status = execvp(cmd[0], cmd);
-				printf("\x1B[31m");
-				//perror(scanCmd[0]); /* execvp failed */
-				if(status<0)
-					printf("Command Not Found: %s\n",cmd[0]);
-				printf("\x1B[0m");
-				exit(0);
-			} else {
-			waitpid(pid);
-		}
-		
-		    for(i=0;cmd[i];i++)
-			free(cmd[i]);
-            }
+    else
+    {
+        FILE *fp;
+        char scan[100];
         
-        exit(0);
+        printf("\x1B[35mEntering batch mode\n \x1B[0m");
+
+        fp = fopen(result[1], "r");
+
+        if (!fp)
+        {
+            perror(result[1]); /* open failed */
+            exit(1);
+        }
+        else
+        {
+            printf("\x1B[32m\x1B[32m ✓ Open successful \x1B[0m\e[0m\n");
+            int line = 0;
+            while (!feof(fp))
+            {
+                // Read line
+                printf("\x1B[32m =========== Line %d:    ===========\x1B[0m\n",++line);
+                fgets(scan, 100, fp);
+                exec_line(scan);
+                
+            }
+
+            exit(0);
         }
     }
 

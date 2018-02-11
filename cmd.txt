@@ -1,5 +1,5 @@
 ls -al
-date
-ls
-ps
-date --date='last monday'
+wow
+date ; date --date=today
+date --date="last friday" ; date
+ps ; quit
