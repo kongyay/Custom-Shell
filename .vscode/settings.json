@@ -2,6 +2,8 @@
     "files.associations": {
         "stat.h": "c",
         "types.h": "c",
-        "assert.h": "c"
+        "assert.h": "c",
+        "wait.h": "c",
+        "pthread.h": "c"
     }
 }

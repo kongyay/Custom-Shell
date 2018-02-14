@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <ctype.h>
+#include <signal.h>
 
 int split(char *str, char *result[], int max_size)
 {
@@ -142,7 +143,7 @@ int forkExec(char** cmd) {
         int status = execvp(cmd[0], cmd);
         //perror(scanCmd[0]); /* execvp failed */
         if (status < 0) {
-            printf("\x1B[31mCommand Not Found: %s\n\x1B[0m", cmd[0]);
+            fprintf(stderr, "\x1B[31m[Command Not Found]: %s\n\x1B[0m", cmd[0]);
             exit(1);
         } 
      
@@ -150,12 +151,12 @@ int forkExec(char** cmd) {
     }
     else
     {
-        int pid_print = fork();
-        if (pid_print == 0) {
-            waitpid(pid);
-            printf("\x1B[34m ------ EXECUTING : %s \x1B[0m\n",cmd[0]);
-            exit(0);
-        }
+        // int pid_print = fork();
+        // if (pid_print == 0) {
+        //     waitpid(pid);
+        //     printf("\x1B[34m ------ EXECUTING : %s \x1B[0m\n",cmd[0]);
+        //     exit(0);
+        // }
         return pid;
     }
 }
@@ -190,11 +191,25 @@ void exec_line(char* scan) {
     if(len>1) printf("\x1B[32m =========== DONE ===========\x1B[0m\n\n");
 }
 
-int main(int argc, char **result)
+void sigint_handler(int sig) {
+    char c;
+    printf("Do you really want to quit [y/N]?");
+    c = getchar();
+    if (c == 'Y' || c == 'y') {
+        exit(0);
+    }
+}
+void sigsegv_handler(int sig) {
+    return;
+}
+
+int main(int argc, char **argv)
 {
     int pid;
     int len,len2;
     
+    signal(SIGINT,sigint_handler);
+    signal(SIGSEGV,sigsegv_handler);
 
     system("clear");
     printf("\e[1m    😃 Welcome\n");
@@ -228,11 +243,11 @@ int main(int argc, char **result)
         
         printf("\x1B[35mEntering batch mode\n \x1B[0m");
 
-        fp = fopen(result[1], "r");
+        fp = fopen(argv[1], "r");
 
         if (!fp)
         {
-            perror(result[1]); /* open failed */
+            perror(argv[1]); /* open failed */
             exit(1);
         }
         else
