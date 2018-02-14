@@ -127,21 +127,27 @@ int splitcmd (char* str, char ***result, char splitter)
     return count;
 }
 
-int forkExec(char** cmd) {
+int forkExec(char** cmd,char len) {
     int i;
-    for (i = 0; cmd[i]; i++)
-    {
-        if (strcmp(cmd[i], "quit") == 0) {
-            printf("\x1B[31mExit shell.. \n\x1B[0m");
-            exit(0);
-        }
-    } 
+    
+    for (i = 0; i<len; i++)
+        // For Debugging
+    
+    if (strcmp(cmd[0], "quit") == 0) {
+        printf("\x1B[31mExit shell.. \n\x1B[0m");
+        exit(0);
+    } else if(strcmp(cmd[0], "cd") == 0) {
+        chdir(cmd[1]);
+        return 0;
+    }
+
+    cmd[len] = 0;
 
     int pid = fork();
     if (pid == 0)
     {
         int status = execvp(cmd[0], cmd);
-        //perror(scanCmd[0]); /* execvp failed */
+        perror(cmd[0]); /* execvp failed */
         if (status < 0) {
             fprintf(stderr, "\x1B[31m[Command Not Found]: %s\n\x1B[0m", cmd[0]);
             exit(1);
@@ -151,12 +157,6 @@ int forkExec(char** cmd) {
     }
     else
     {
-        // int pid_print = fork();
-        // if (pid_print == 0) {
-        //     waitpid(pid);
-        //     printf("\x1B[34m ------ EXECUTING : %s \x1B[0m\n",cmd[0]);
-        //     exit(0);
-        // }
         return pid;
     }
 }
@@ -179,9 +179,9 @@ void exec_line(char* scan) {
     if(len>1) printf("\x1B[32m =========== %d commands ===========\x1B[0m\n",len);
     for(i = 0;concur[i];i++) {
         
-        cmd = malloc(sizeof(concur[i]));
+        cmd = malloc(sizeof(char *) * 100);
         len2 = split(concur[i],cmd,100);
-        pid[i] = forkExec(cmd);
+        pid[i] = forkExec(cmd,len2);
         
         
     }
@@ -192,16 +192,12 @@ void exec_line(char* scan) {
 }
 
 void sigint_handler(int sig) {
-    char c;
-    printf("Do you really want to quit [y/N]?");
-    c = getchar();
-    if (c == 'Y' || c == 'y') {
-        exit(0);
-    }
+    system("clear");
+    printf("\e[1mBye Ja 😃\n");
+    exit(0);
+
 }
-void sigsegv_handler(int sig) {
-    return;
-}
+
 
 int main(int argc, char **argv)
 {
@@ -209,7 +205,7 @@ int main(int argc, char **argv)
     int len,len2;
     
     signal(SIGINT,sigint_handler);
-    signal(SIGSEGV,sigsegv_handler);
+    //signal(SIGSEGV,sigsegv_handler);
 
     system("clear");
     printf("\e[1m    😃 Welcome\n");
