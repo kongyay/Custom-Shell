@@ -1,0 +1,9 @@
+ls              -al ; date
+date
+ls
+date
+date > op2.txt --date="last monday" ; date
+date
+ls
+date
+ls

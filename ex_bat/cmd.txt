@@ -2,5 +2,5 @@ ls -al
 wow
 date ; date --date=today
 date --date="last friday" ; date
-date --date="next monday" > dategay.txt
+date --date="next monday" > dateg.txt
 ps

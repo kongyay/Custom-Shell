@@ -1,0 +1,8 @@
+date --date="monday" > op1.txt ; date --date="monday" >> op.txt
+date --date="tuesday" > op2.txt ; date --date="tuesday" >> op.txt
+date --date="wednesday" > op3.txt ; date --date="wednesday" >> op.txt
+date --date="thursday" > op4.txt ; date --date="thursday" >> op.txt
+date --date="friday" > op5.txt ; date --date="friday" >> op.txt
+date --date="saturday" > op6.txt ; date --date="saturday" >> op.txt
+date --date="sunday" > op7.txt ; date --date="sunday" >> op.txt
+echo Be Happy Everyday :) > bless.txt

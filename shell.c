@@ -12,6 +12,12 @@
 
 int split(char *str, char *result[], int max_size)
 {
+    if (str[0] == 0)
+    {
+        result[0] = 0;
+        return 0;
+    }
+
     char *p, *start_of_word;
     int c;
     enum states
@@ -144,46 +150,17 @@ int splitcmd(char *str, char ***result, char splitter)
     return count;
 }
 
-int forkExec(char **cmd, char len) 
+int forkExec(char **cmd, char len)
 {
-    int i,j;
-    int isRedirected = 0;
-    int newfd;
+    int i, j, pid;
 
-    for (i = 0; i < len-1; i++) {
-        if(strcmp(cmd[i], ">") == 0) {
-            isRedirected = 1;
-            int pid = fork();
-            
-            char* filename = cmd[i+1];
-            if(pid == 0) {
-                // Open file for redirection
-                if ((newfd = open(filename, O_CREAT|O_TRUNC|O_WRONLY, 0644)) < 0) { 
-                    perror(filename); /* open failed */
-                    return 1;
-                }
-
-                // Remove " > .... " arguments
-                len -= 2;
-                for (j = i; j < len; j++) {
-                    memmove(cmd+j, cmd+j+2, sizeof(cmd[0]));
-                }
-                
-                dup2(newfd,1);
-            } else {
-                fprintf(stderr,"\x1B[32m Output is in %s\x1B[0m\n", filename);
-                return 0;
-            }
-                
-        }
-            
-    }
-
-        
-
-    if (strcmp(cmd[0], "quit") == 0)
+    if (len == 0)
     {
-        fprintf(stderr,"\x1B[31mExit shell.. \n\x1B[0m");
+        return 0;
+    }
+    else if (strcmp(cmd[0], "quit") == 0)
+    {
+        fprintf(stderr, "\x1B[31mExit shell.. \n\x1B[0m");
         exit(0);
     }
     else if (strcmp(cmd[0], "cd") == 0)
@@ -191,20 +168,57 @@ int forkExec(char **cmd, char len)
         chdir(cmd[1]);
         return 0;
     }
-    else if (strcmp(cmd[0], SHELL_NAME) == 0)  
+    else if (strcmp(cmd[0], SHELL_NAME) == 0)
     {
         fileScanner(cmd[1]);
         return 0;
     }
 
+    int newfd, savefd, isRedirected = 0;
+    for (i = 0; i < len - 1; i++)
+    {
+        if(cmd[i][0] == '>') {
+            isRedirected = 1;
+
+            char *filename = cmd[i + 1];
+            // Open file for redirection
+            if (strcmp(cmd[i], ">") == 0) {
+                if ((newfd = open(filename, O_CREAT | O_TRUNC | O_WRONLY, 0644)) < 0)
+                {
+                    perror(filename); /* open failed */
+                    return 1;
+                }
+                fprintf(stderr, "\x1B[36m Output written in %s\x1B[0m\n", filename);
+            } else if (strcmp(cmd[i], ">>") == 0) {
+                if ((newfd = open(filename, O_CREAT | O_WRONLY | O_APPEND, 0644)) < 0)
+                {
+                    perror(filename); /* open failed */
+                    return 1;
+                }
+                fprintf(stderr, "\x1B[35m Output appended to %s\x1B[0m\n", filename);
+            }
+            
+            
+
+            // Remove " > .... " arguments
+            len -= 2;
+            for (j = i; j < len; j++)
+            {
+                memmove(cmd + j, cmd + j + 2, sizeof(cmd[0]));
+            }
+            savefd = dup(1);
+            dup2(newfd, 1);
+         }
+    }
+
     cmd[len] = 0;
 
-    int pid = fork();
+    pid = fork();
     if (pid == 0)
     {
         int status = execvp(cmd[0], cmd);
         perror(cmd[0]); /* execvp failed */
-            
+
         if (status < 0)
         {
             fprintf(stderr, "\x1B[31m[Command Not Found]: %s\n\x1B[0m", cmd[0]);
@@ -215,9 +229,12 @@ int forkExec(char **cmd, char len)
     else
     {
         // if child comes from dup2, dont let it be another parent
-        if(isRedirected) {
-            dup2(1,newfd);
-            exit(0);
+        if (isRedirected)
+        {
+            dup2(savefd, 1);
+            close(newfd);
+            close(savefd);
+            return 0;
         }
 
         return pid;
@@ -235,25 +252,26 @@ void exec_line(char *scan)
         scan[strlen(scan) - 1] = '\0';
 
     // Split command by ';'
+
     concur = malloc(sizeof(scan));
     len = splitcmd(scan, &concur, ';');
 
     // Run each command concurrently
     int pid[len];
     if (len > 1)
-        fprintf(stderr,"\x1B[32m =========== %d commands ===========\x1B[0m\n", len);
-    for (i = 0; concur[i]; i++)
+        fprintf(stderr, "\x1B[32m =========== %d commands ===========\x1B[0m\n", len);
+    for (i = 0; i < len; i++)
     {
 
         cmd = malloc(sizeof(char *) * MAX_CHAR);
         len2 = split(concur[i], cmd, MAX_CHAR);
+
         pid[i] = forkExec(cmd, len2);
     }
+
     for (i = 0; i < len; i++)
         waitpid(pid[i]);
 
-    if (len > 1)
-        fprintf(stderr,"\x1B[32m =========== DONE ===========\x1B[0m\n\n");
 }
 
 int fileScanner(char *filename)
@@ -261,7 +279,7 @@ int fileScanner(char *filename)
     FILE *fp;
     char scan[MAX_CHAR];
 
-    fprintf(stderr,"\x1B[35mEntering batch mode\n \x1B[0m");
+    fprintf(stderr, "\x1B[35mEntering batch mode\n \x1B[0m");
 
     fp = fopen(filename, "r");
 
@@ -272,16 +290,17 @@ int fileScanner(char *filename)
     }
     else
     {
-        fprintf(stderr,"\x1B[32m\x1B[32m ✓ Open successful \x1B[0m\e[0m\n");
+        fprintf(stderr, "\x1B[32m\x1B[32m ✓ Open successful \x1B[0m\e[0m\n");
         int line = 0;
         while (!feof(fp))
         {
             // Read line
-            fprintf(stderr,"\x1B[32m =========== Line %d:    ===========\x1B[0m\n", ++line);
-            fscanf(fp,"%[^\n]\n",scan);
+            fprintf(stderr, "\x1B[32m =========== Line %d:    ===========\x1B[0m\n", ++line);
+            fscanf(fp, "%[^\n]\n", scan);
             //fgets(scan, MAX_CHAR, fp);
             exec_line(scan);
         }
+        fclose(fp);
 
         return 0;
     }
@@ -290,7 +309,7 @@ int fileScanner(char *filename)
 void sigint_handler(int sig)
 {
     //system("clear");
-    fprintf(stderr,"\e[1mGood Bye 😃\n");
+    fprintf(stderr, "\e[1mGood Bye 😃\n");
     exit(0);
 }
 
@@ -301,26 +320,25 @@ int main(int argc, char **argv)
 
     signal(SIGINT, sigint_handler);
     //signal(SIGSEGV,sigsegv_handler);
-    
+
     system("clear");
-    fprintf(stderr,"\e[1m    😃 Welcome\n");
+    fprintf(stderr, "\e[1m    😃 Welcome\n");
 
     // interactive
     if (argc < 2)
     {
-        fprintf(stderr,"\x1B[35mInteractive mode\n\e[0m");
+        fprintf(stderr, "\x1B[35mInteractive mode\n\e[0m");
 
         while (1)
         {
 
             char scan[MAX_CHAR];
-            fprintf(stderr,"\e[1m\x1B[32m \nprompt> \e[0m\x1B[0m");
+            fprintf(stderr, "\e[1m\x1B[32m \nprompt> \e[0m\x1B[0m");
             fflush(stdin);
             gets(scan);
 
             exec_line(scan);
         }
-        
 
         exit(0);
     }
